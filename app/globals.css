@@ -1,0 +1,103 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=Caveat:wght@400;700&family=Architects+Daughter&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 33% 92%;
+    --foreground: 0 54% 15%;
+
+    --card: 222 20% 11%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 20% 11%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 258 90% 66%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 222 20% 18%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 222 20% 14%;
+    --muted-foreground: 215 20% 55%;
+
+    --accent: 258 60% 30%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 222 20% 20%;
+    --input: 222 20% 16%;
+    --ring: 258 90% 66%;
+
+    --chart-1: 258 90% 66%;
+    --chart-2: 320 70% 60%;
+    --chart-3: 180 60% 50%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+
+    --radius: 0.75rem;
+
+    /* Bookify brand tokens */
+    --bookmark: 258 90% 66%;
+    --bookmark-glow: 258 90% 66% / 0.25;
+    --spine-1: 258 90% 66%;
+    --spine-2: 320 70% 60%;
+    --spine-3: 43 74% 66%;
+    --spine-4: 180 60% 50%;
+    --spine-5: 27 87% 67%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  h1, h2, h3 {
+    font-family: 'Fraunces', Georgia, serif;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .glow-primary {
+    box-shadow: 0 0 40px hsl(var(--bookmark-glow));
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, hsl(258, 90%, 75%) 0%, hsl(320, 70%, 70%) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .font-handwritten {
+    font-family: 'Caveat', cursive;
+  }
+
+  .font-sketch {
+    font-family: 'Architects Daughter', cursive;
+  }
+
+  .notebook-lines {
+    background-image: linear-gradient(rgba(60, 18, 18, 0.08) 1px, transparent 1px);
+    background-size: 100% 28px;
+    line-height: 28px;
+  }
+}

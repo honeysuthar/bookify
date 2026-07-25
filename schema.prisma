@@ -1,0 +1,536 @@
+// ============================================================================
+// BOOKIFY — PRODUCTION DATABASE SCHEMA
+// PostgreSQL + Prisma ORM
+// ============================================================================
+// Design principles applied throughout:
+// 1. External book data (Google Books / Open Library) is fetched once and
+//    cached locally as `Book` rows. Nothing else ever calls the external API
+//    directly — everything joins against our own tables.
+// 2. Facts (sessions, ratings, logs) are immutable and append-only.
+//    Insights (stats, personality, recommendations) are computed/cached
+//    tables, rebuilt on a schedule or on relevant writes — never derived
+//    live on every request.
+// 3. Every many-to-many relationship uses an explicit join table so we keep
+//    referential integrity and can index/query both directions cheaply.
+// 4. Every foreign key that will be filtered or joined on in a hot path has
+//    an explicit @@index. Composite uniques double as natural indexes.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+}
+
+enum BookSource {
+  GOOGLE_BOOKS
+  OPEN_LIBRARY
+  MANUAL
+}
+
+enum ReadingStatus {
+  WANT_TO_READ
+  CURRENTLY_READING
+  FINISHED
+  PAUSED
+  DID_NOT_FINISH
+}
+
+enum Mood {
+  COZY
+  HAPPY
+  HEARTBROKEN
+  DARK_ACADEMIA
+  RAINY_DAY
+  ADVENTURE
+  FANTASY_ESCAPE
+  MOTIVATED
+  ROMANTIC
+  MYSTERIOUS
+  HOPEFUL
+  CALM
+}
+
+enum GoalPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum GoalTargetType {
+  BOOKS
+  PAGES
+  MINUTES
+}
+
+enum RewardType {
+  TITLE
+  BADGE
+  THEME
+  AVATAR_FRAME
+}
+
+enum NotificationType {
+  READING_REMINDER
+  GOAL_COMPLETED
+  ACHIEVEMENT_UNLOCKED
+  NEW_RECOMMENDATION
+  FRIEND_ACTIVITY
+  STREAK
+}
+
+enum RecommendationAlgorithm {
+  GENRE_AFFINITY
+  AUTHOR_AFFINITY
+  MOOD_MATCH
+  COLLABORATIVE
+  SIMILAR_READERS
+  BECAUSE_YOU_READ
+  EDITORS_PICK
+}
+
+// ============================================================================
+// USER & AUTH
+// ============================================================================
+
+model User {
+  id            String       @id @default(cuid())
+  email         String       @unique
+  username      String       @unique
+  passwordHash  String? // null when authProvider = GOOGLE
+  authProvider  AuthProvider @default(EMAIL)
+  emailVerified Boolean      @default(false)
+
+  name       String
+  avatarUrl  String?
+  bio        String?
+  readingLevel Int    @default(1)
+  xp           Int    @default(0)
+  coins        Int    @default(0)
+
+  currentStreak  Int       @default(0)
+  longestStreak  Int       @default(0)
+  lastReadDate   DateTime?
+
+  totalBooksRead Int @default(0)
+  totalPagesRead Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // relations
+  library             UserLibrary[]
+  favorites            Favorite[]
+  collections          Collection[]
+  sessions             ReadingSession[]
+  goals                ReadingGoal[]
+  stats                ReadingStats[]
+  achievements         UserAchievement[]
+  rewards              UserReward[]
+  recommendations      Recommendation[]
+  personalityProfile   PersonalityProfile?
+  moodHistory          MoodHistory[]
+  notifications        Notification[]
+  reviews              Review[]
+  ratings              Rating[]
+  streakLogs           StreakLog[]
+
+  @@index([username])
+  @@index([email])
+}
+
+// ============================================================================
+// BOOK CATALOG (cached from external APIs)
+// ============================================================================
+
+model Book {
+  id            String     @id @default(cuid())
+  externalId    String // Google Books volume id / Open Library work id
+  source        BookSource
+  isbn10        String?
+  isbn13        String?
+  title         String
+  subtitle      String?
+  description   String?
+  coverUrl      String?
+  pageCount     Int?
+  publishedDate DateTime?
+  publisher     String?
+  language      String?
+  averageRating Float?
+  ratingsCount  Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  authors     BookAuthor[]
+  genres      BookGenre[]
+  library     UserLibrary[]
+  sessions    ReadingSession[]
+  favorites   Favorite[]
+  reviews     Review[]
+  ratings     Rating[]
+  collectionBooks CollectionBook[]
+  recommendations Recommendation[]
+  moodHistory MoodHistory[]
+
+  @@unique([source, externalId])
+  @@index([title])
+  @@index([isbn13])
+}
+
+model Author {
+  id         String  @id @default(cuid())
+  name       String
+  bio        String?
+  photoUrl   String?
+  externalId String?
+
+  books BookAuthor[]
+
+  @@index([name])
+}
+
+model BookAuthor {
+  bookId   String
+  authorId String
+
+  book   Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  author Author @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@id([bookId, authorId])
+  @@index([authorId])
+}
+
+model Genre {
+  id   String @id @default(cuid())
+  name String @unique
+  slug String @unique
+
+  books BookGenre[]
+}
+
+model BookGenre {
+  bookId  String
+  genreId String
+
+  book  Book  @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([bookId, genreId])
+  @@index([genreId])
+}
+
+// ============================================================================
+// PERSONAL LIBRARY / SHELVES
+// ============================================================================
+
+// The spine of the app: one row per (user, book). Drives shelves, the
+// tracker, and most recommendation signals.
+model UserLibrary {
+  id          String        @id @default(cuid())
+  userId      String
+  bookId      String
+  status      ReadingStatus @default(WANT_TO_READ)
+  currentPage Int           @default(0)
+
+  addedAt    DateTime  @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+  updatedAt  DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bookId])
+  @@index([userId, status])
+  @@index([bookId])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  bookId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bookId])
+}
+
+model Collection {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  coverUrl    String?
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  books CollectionBook[]
+
+  @@index([userId])
+}
+
+model CollectionBook {
+  collectionId String
+  bookId       String
+  addedAt      DateTime @default(now())
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  book       Book       @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, bookId])
+  @@index([bookId])
+}
+
+// ============================================================================
+// READING ACTIVITY (facts — append-only)
+// ============================================================================
+
+model ReadingSession {
+  id              String   @id @default(cuid())
+  userId          String
+  bookId          String
+  startPage       Int
+  endPage         Int
+  pagesRead       Int
+  durationMinutes Int
+  mood            Mood?
+  startedAt       DateTime
+  endedAt         DateTime
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([bookId])
+}
+
+// Daily rollup — one row per user per calendar day. Powers the streak
+// counter and the heatmap without scanning ReadingSession on every request.
+model StreakLog {
+  id         String   @id @default(cuid())
+  userId     String
+  date       DateTime // stored as date-truncated (00:00 UTC)
+  pagesRead  Int      @default(0)
+  minutesRead Int     @default(0)
+  xpEarned   Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+// ============================================================================
+// GOALS & STATS
+// ============================================================================
+
+model ReadingGoal {
+  id          String         @id @default(cuid())
+  userId      String
+  period      GoalPeriod
+  targetType  GoalTargetType
+  targetValue Int
+  periodStart DateTime
+  periodEnd   DateTime
+  currentValue Int           @default(0)
+  achieved    Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, period, periodStart])
+}
+
+// Precomputed aggregates for dashboard/analytics screens. Rebuilt by a
+// background job (or on-write for the current period) rather than
+// aggregated live from ReadingSession every page load.
+model ReadingStats {
+  id                 String     @id @default(cuid())
+  userId             String
+  period             GoalPeriod
+  periodStart        DateTime
+  booksFinished      Int        @default(0)
+  pagesRead          Int        @default(0)
+  minutesRead        Int        @default(0)
+  avgPagesPerSession Float      @default(0)
+  longestSessionMin  Int        @default(0)
+  consistencyScore   Float      @default(0) // 0-1, % of days in period with a session
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, period, periodStart])
+}
+
+// ============================================================================
+// GAMIFICATION
+// ============================================================================
+
+// Catalog of all possible achievements (static-ish reference data)
+model Achievement {
+  id          String   @id @default(cuid())
+  key         String   @unique // "FIRST_BOOK", "NIGHT_READER", ...
+  name        String
+  description String
+  iconUrl     String?
+  category    String
+  xpReward    Int      @default(0)
+  coinReward  Int      @default(0)
+
+  users UserAchievement[]
+}
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  achievementId String
+  earnedAt      DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+}
+
+// Catalog of unlockable titles/badges/themes/avatar frames
+model Reward {
+  id              String     @id @default(cuid())
+  key             String     @unique
+  name            String
+  description     String
+  type            RewardType
+  unlockCondition String // human-readable / rule-engine key, e.g. "GENRE_FANTASY_10_BOOKS"
+
+  users UserReward[]
+}
+
+model UserReward {
+  id         String   @id @default(cuid())
+  userId     String
+  rewardId   String
+  unlockedAt DateTime @default(now())
+  isEquipped Boolean  @default(false)
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reward Reward @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, rewardId])
+  @@index([userId])
+}
+
+// ============================================================================
+// PERSONALIZATION & RECOMMENDATIONS
+// ============================================================================
+
+model Recommendation {
+  id        String                  @id @default(cuid())
+  userId    String
+  bookId    String
+  algorithm RecommendationAlgorithm
+  reason    String // human-readable: "Because you read Fourth Wing"
+  score     Float
+  dismissed Boolean                 @default(false)
+  createdAt DateTime                @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bookId, algorithm])
+  @@index([userId, dismissed])
+}
+
+// One row per user — the Reader Personality Engine's output. Recomputed
+// periodically (e.g. weekly, or after N new sessions) rather than per request.
+model PersonalityProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  genreDistribution Json // { "Fantasy": 42, "Mystery": 21, ... }
+  archetype        String // "The Midnight Librarian"
+  summary          String   @db.Text
+  strengths        Json // ["Consistent reader", "Rarely abandons books"]
+  computedAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MoodHistory {
+  id       String   @id @default(cuid())
+  userId   String
+  mood     Mood
+  bookId   String?
+  loggedAt DateTime @default(now())
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book Book? @relation(fields: [bookId], references: [id], onDelete: SetNull)
+
+  @@index([userId, loggedAt])
+}
+
+// ============================================================================
+// SOCIAL / ENGAGEMENT
+// ============================================================================
+
+model Review {
+  id               String   @id @default(cuid())
+  userId           String
+  bookId           String
+  content          String   @db.Text
+  containsSpoilers Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bookId])
+  @@index([bookId])
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  userId    String
+  bookId    String
+  score     Int // 1-5
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bookId])
+  @@index([bookId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String
+  isRead    Boolean          @default(false)
+  metadata  Json?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+}

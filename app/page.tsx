@@ -1,84 +1,98 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { BookOpen, Sparkles, TrendingUp, ArrowRight } from "lucide-react";
+"use client";
+
+import { useRouter } from "next/navigation";
+import { ArrowRight } from "lucide-react";
+import { useState } from "react";
 
 export default function LandingPage() {
+  const router = useRouter();
+  const [leaving, setLeaving] = useState(false);
+
+  const handleEnter = () => {
+    if (leaving) return;
+    setLeaving(true);
+    // Brief fade-out, then navigate
+    setTimeout(() => router.push("/dashboard"), 500);
+  };
+
   return (
-    <main className="min-h-screen bg-background">
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
-        <div className="flex items-center gap-2">
-          <BookOpen className="h-7 w-7 text-primary" />
-          <span className="text-xl font-bold text-gradient font-sans">Bookify</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" asChild>
-            <Link href="/login">Log In</Link>
-          </Button>
-          <Button asChild>
-            <Link href="/signup">Sign Up Free</Link>
-          </Button>
-        </div>
-      </nav>
+    <main
+      className="fixed inset-0 flex flex-col items-center justify-center overflow-hidden"
+      style={{
+        backgroundColor: "#c9a87a",
+        transition: "opacity 0.5s ease",
+        opacity: leaving ? 0 : 1,
+      }}
+    >
+      <style>{`
+        @keyframes pageFadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        .page-enter { animation: pageFadeIn 0.8s ease forwards; }
 
-      {/* Hero */}
-      <section className="flex flex-col items-center justify-center text-center px-6 pt-24 pb-16 max-w-4xl mx-auto">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass text-sm text-muted-foreground mb-8">
-          <Sparkles className="h-3.5 w-3.5 text-primary" />
-          <span>Books are the input. Identity is the output.</span>
+        @keyframes fadeOut {
+          from { opacity: 1; }
+          to   { opacity: 0; }
+        }
+        @keyframes popIn {
+          0%   { opacity: 0; transform: scale(0.97); }
+          60%  { opacity: 1; transform: scale(1.015); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes buttonReveal {
+          from { opacity: 0; transform: translateY(14px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .btn-primary {
+          animation: buttonReveal 0.6s 3.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+          opacity: 0;
+        }
+        .btn-secondary {
+          animation: buttonReveal 0.6s 3.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+          opacity: 0;
+        }
+      `}</style>
+
+      <div className="page-enter flex flex-col items-center w-full max-w-4xl px-4">
+        {/* Logo area */}
+        <div className="w-full h-40 md:h-56 lg:h-64 flex items-center justify-center -mb-8 relative">
+          {/* Handwriting trace — fades out at 3.2s */}
+          <img
+            src="/bookify_intro.svg"
+            alt="bookify trace intro"
+            className="absolute inset-0 w-full h-full max-w-lg object-contain mx-auto"
+            style={{ animation: "fadeOut 0.5s 3.2s ease forwards" }}
+          />
+          {/* Final logo — pops in at 3.3s */}
+          <img
+            src="/bookify.svg"
+            alt="bookify"
+            className="absolute inset-0 w-full h-full max-w-lg object-contain mx-auto"
+            style={{ animation: "popIn 0.7s 3.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards", opacity: 0 }}
+          />
         </div>
 
-        <h1 className="text-5xl md:text-7xl font-bold leading-tight mb-6 font-sans">
-          <span className="text-gradient">Bookify</span>
-        </h1>
-        <p className="text-2xl md:text-3xl text-foreground mb-4 font-semibold">
-          Your reading, <span className="text-primary">reimagined</span>.
-        </p>
-        <p className="text-lg text-muted-foreground max-w-2xl mb-10">
-          Track your reads, build your streak, discover who you&apos;re becoming
-          as a reader. Not just a catalogue — a mirror.
-        </p>
-
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Button size="lg" className="gap-2 text-base px-8 glow-primary" asChild>
-            <Link href="/signup">
-              Start Reading <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
-          <Button size="lg" variant="outline" className="text-base px-8" asChild>
-            <Link href="/login">Log In</Link>
-          </Button>
+        {/* Buttons */}
+        <div className="flex flex-row gap-4 mt-8">
+          <button
+            onClick={handleEnter}
+            disabled={leaving}
+            className="btn-primary flex items-center gap-2 px-8 py-3.5 rounded-xl text-base font-medium shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all active:translate-y-0 disabled:opacity-50"
+            style={{ backgroundColor: "#0f0705", color: "#c9a87a" }}
+          >
+            Start Reading <ArrowRight className="h-4 w-4" />
+          </button>
+          <button
+            onClick={handleEnter}
+            disabled={leaving}
+            className="btn-secondary flex items-center justify-center px-8 py-3.5 rounded-xl text-base font-medium border border-[#0f0705]/20 hover:bg-[#0f0705]/5 transition-all disabled:opacity-50"
+            style={{ color: "#0f0705" }}
+          >
+            Log In
+          </button>
         </div>
-      </section>
-
-      {/* Feature highlights */}
-      <section className="max-w-5xl mx-auto px-6 pb-24 grid md:grid-cols-3 gap-6">
-        {[
-          {
-            icon: BookOpen,
-            title: "Your Library",
-            desc: "Every book you've read, are reading, or want to read — beautifully organized.",
-          },
-          {
-            icon: TrendingUp,
-            title: "Reading Streaks",
-            desc: "Build a daily habit with streaks, XP, and goals that actually feel achievable.",
-          },
-          {
-            icon: Sparkles,
-            title: "Reader Identity",
-            desc: "Discover your reading archetype — The Midnight Librarian, The Fantasy Wanderer, and more.",
-          },
-        ].map((f) => (
-          <div key={f.title} className="glass rounded-2xl p-6 flex flex-col gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-              <f.icon className="h-5 w-5 text-primary" />
-            </div>
-            <h2 className="text-lg font-semibold text-foreground">{f.title}</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
-          </div>
-        ))}
-      </section>
+      </div>
     </main>
   );
 }

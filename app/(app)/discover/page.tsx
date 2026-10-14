@@ -10,10 +10,13 @@ export default function DiscoverPage({ searchParams }: { searchParams: { mood?: 
   const currentQuery = searchParams.q;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+    <div className="max-w-5xl mx-auto px-4 pt-20 md:pt-24 pb-16 space-y-8">
       {/* Header + Search */}
       <div className="flex flex-col gap-4">
-        <h1 className="text-3xl font-bold text-foreground">Discover</h1>
+        <div>
+          <h1 className="text-3xl font-bold font-serif text-[#f0dfc0]">Town Bookstore</h1>
+          <p className="text-xs text-[#a6907c] mt-1">Browse new arrivals, curated collections, and community favorites</p>
+        </div>
         <SearchInput />
       </div>
 

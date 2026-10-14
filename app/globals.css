@@ -6,50 +6,57 @@
 
 @layer base {
   :root {
-    --background: 40 33% 92%;
-    --foreground: 0 54% 15%;
+    /* Hearth warm palette — background is deep espresso brown */
+    --background: 10 63% 5%;        /* #0f0705 */
+    --foreground: 34 60% 88%;       /* #e8d5c0 */
 
-    --card: 222 20% 11%;
-    --card-foreground: 210 40% 98%;
+    /* Cards use a slightly lighter warm brown */
+    --card: 10 57% 7%;              /* #160a05 */
+    --card-foreground: 34 60% 88%;  /* #e8d5c0 */
 
-    --popover: 222 20% 11%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 10 57% 7%;           /* #160a05 */
+    --popover-foreground: 34 60% 88%;
 
-    --primary: 258 90% 66%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary = warm amber gold */
+    --primary: 33 47% 63%;          /* #c9a87a */
+    --primary-foreground: 10 63% 5%; /* #0f0705 */
 
-    --secondary: 222 20% 18%;
-    --secondary-foreground: 210 40% 98%;
+    /* Secondary = slightly lighter brown */
+    --secondary: 14 67% 9%;         /* #1e0d06 */
+    --secondary-foreground: 34 60% 88%;
 
-    --muted: 222 20% 14%;
-    --muted-foreground: 215 20% 55%;
+    /* Muted = dark warm brown */
+    --muted: 14 60% 11%;            /* #2a1508 */
+    --muted-foreground: 28 32% 47%; /* #8a6040 */
 
-    --accent: 258 60% 30%;
-    --accent-foreground: 210 40% 98%;
+    /* Accent = mid warm brown */
+    --accent: 20 63% 11%;           /* #2a1508 */
+    --accent-foreground: 34 60% 88%;
 
     --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 34 60% 88%;
 
-    --border: 222 20% 20%;
-    --input: 222 20% 16%;
-    --ring: 258 90% 66%;
+    --border: 14 60% 11%;           /* #2a1508 */
+    --input: 14 60% 11%;            /* #2a1508 */
+    --ring: 33 47% 63%;             /* #c9a87a */
 
-    --chart-1: 258 90% 66%;
-    --chart-2: 320 70% 60%;
-    --chart-3: 180 60% 50%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    /* Chart colors — warm campfire palette */
+    --chart-1: 33 47% 63%;          /* amber gold   #c9a87a */
+    --chart-2: 28 56% 38%;          /* burnt sienna #8a5a28 */
+    --chart-3: 20 63% 20%;          /* dark mahogany */
+    --chart-4: 40 70% 72%;          /* pale gold    #f0dfc0 */
+    --chart-5: 27 55% 50%;          /* warm orange  */
 
     --radius: 0.75rem;
 
     /* Bookify brand tokens */
-    --bookmark: 258 90% 66%;
-    --bookmark-glow: 258 90% 66% / 0.25;
-    --spine-1: 258 90% 66%;
-    --spine-2: 320 70% 60%;
-    --spine-3: 43 74% 66%;
-    --spine-4: 180 60% 50%;
-    --spine-5: 27 87% 67%;
+    --bookmark: 33 47% 63%;
+    --bookmark-glow: 33 47% 63% / 0.25;
+    --spine-1: 33 47% 63%;
+    --spine-2: 28 56% 38%;
+    --spine-3: 40 70% 72%;
+    --spine-4: 20 63% 20%;
+    --spine-5: 27 55% 50%;
   }
 }
 
@@ -70,10 +77,10 @@
 
 @layer utilities {
   .glass {
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(42, 21, 8, 0.60);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(201, 168, 122, 0.12);
   }
 
   .glow-primary {
@@ -81,7 +88,7 @@
   }
 
   .text-gradient {
-    background: linear-gradient(135deg, hsl(258, 90%, 75%) 0%, hsl(320, 70%, 70%) 100%);
+    background: linear-gradient(135deg, #c9a87a 0%, #f0dfc0 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -99,5 +106,56 @@
     background-image: linear-gradient(rgba(60, 18, 18, 0.08) 1px, transparent 1px);
     background-size: 100% 28px;
     line-height: 28px;
+  }
+
+  .handwriting-text {
+    font-family: var(--font-great-vibes), cursive;
+    font-size: 80px;
+    fill: transparent;
+    stroke: #0f0705;
+    stroke-width: 1.5px;
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    animation: write 3s ease-in-out forwards, fillText 0.5s 2.5s ease-in-out forwards;
+  }
+
+  @keyframes write {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes fillText {
+    to {
+      fill: #0f0705;
+    }
+  }
+
+  @keyframes zoomInUp {
+    0% {
+      opacity: 0;
+      transform: translateY(20px) scale(0.95);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .animate-buttons {
+    opacity: 0;
+    animation: zoomInUp 0.8s 3s ease-out forwards;
+  }
+
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
   }
 }

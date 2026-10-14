@@ -16,10 +16,11 @@ const shelves: { label: string; status: ReadingStatus }[] = [
 ];
 
 export default function LibraryPage() {
-  const { library, updateStatus, removeBook } = useLibrary();
+  const { library, updateStatus, removeBook, loading } = useLibrary();
   const [activeTab, setActiveTab] = useState<ReadingStatus>("CURRENTLY_READING");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [userPickedTab, setUserPickedTab] = useState(false);
+  const [brokenCovers, setBrokenCovers] = useState<Set<string>>(new Set());
 
   const allEntries = Object.values(library);
 
@@ -41,13 +42,24 @@ export default function LibraryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allEntries.length]);
 
+  if (loading) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 pt-20 md:pt-24 pb-16 flex items-center justify-center h-[50vh]">
+        <p className="text-sm text-muted-foreground animate-pulse">Loading your shelf...</p>
+      </div>
+    );
+  }
+
   const visibleEntries = allEntries.filter((e) => e.status === activeTab);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-5xl mx-auto px-4 pt-20 md:pt-24 pb-16 space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-foreground">My Library</h1>
-        <Button size="sm" className="gap-2" asChild>
+        <div>
+          <h1 className="text-3xl font-bold font-serif text-[#f0dfc0]">My Shelf</h1>
+          <p className="text-xs text-[#a6907c] mt-1">Your personal collection, reading progress, and saved books</p>
+        </div>
+        <Button size="sm" className="gap-2 bg-[#c9a87a] text-[#0f0705] hover:bg-[#d8b88a]" asChild>
           <Link href="/discover">
             <Plus className="h-4 w-4" /> Add Book
           </Link>
@@ -65,13 +77,13 @@ export default function LibraryPage() {
             }}
             className={`shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
               activeTab === shelf.status
-                ? "bg-primary text-primary-foreground"
-                : "glass text-muted-foreground hover:text-foreground"
+                ? "bg-[#c9a87a] text-[#0f0705] font-semibold shadow-md"
+                : "bg-black/40 text-foreground/80 hover:bg-black/60 border border-white/10"
             }`}
           >
             {shelf.label}
             {shelfCounts[shelf.label] > 0 && (
-              <span className="ml-2 text-xs opacity-70">{shelfCounts[shelf.label]}</span>
+              <span className="ml-2 text-xs opacity-75">{shelfCounts[shelf.label]}</span>
             )}
           </button>
         ))}
@@ -80,17 +92,17 @@ export default function LibraryPage() {
       {/* Empty state (per-shelf, honest) */}
       {visibleEntries.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-            <BookOpen className="h-8 w-8 text-primary/40" />
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 border border-[#c9a87a]/20">
+            <BookOpen className="h-8 w-8 text-[#c9a87a]" />
           </div>
-          <h2 className="text-lg font-semibold text-foreground mb-2">Nothing here yet</h2>
-          <p className="text-sm text-muted-foreground max-w-xs mb-6">
+          <h2 className="text-lg font-serif font-semibold text-[#f0dfc0] mb-2">Nothing here yet</h2>
+          <p className="text-sm text-[#a6907c] max-w-xs mb-6">
             {allEntries.length === 0
-              ? "Start by discovering books and saving them to your library."
+              ? "Start by discovering books and saving them to your shelf."
               : `No books on your "${shelves.find((s) => s.status === activeTab)?.label}" shelf yet.`}
           </p>
-          <Button asChild>
-            <Link href="/discover">Browse Discover</Link>
+          <Button asChild className="bg-[#c9a87a] text-[#0f0705] hover:bg-[#d8b88a]">
+            <Link href="/discover">Browse Bookstore</Link>
           </Button>
         </div>
       ) : (
@@ -98,14 +110,14 @@ export default function LibraryPage() {
           {visibleEntries.map((entry) => (
             <div key={entry.bookId} className="group relative">
               <Link href={`/book/${entry.bookId}`} className="block">
-                <div className="relative w-full aspect-[2/3] rounded-xl bg-muted/50 flex items-center justify-center mb-2 overflow-hidden">
-                  {entry.coverUrl ? (
-                    <Image
+                <div className="relative w-full aspect-[2/3] rounded-xl bg-[#160a05]/80 border border-[#2a1508] shadow-lg flex items-center justify-center mb-2 overflow-hidden transition-transform group-hover:-translate-y-1 group-hover:shadow-2xl">
+                  {entry.coverUrl && !brokenCovers.has(entry.bookId) ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
                       src={entry.coverUrl}
                       alt={entry.title}
-                      fill
-                      className="object-cover"
-                      sizes="200px"
+                      className="w-full h-full object-cover"
+                      onError={() => setBrokenCovers((prev) => new Set(prev).add(entry.bookId))}
                     />
                   ) : (
                     <BookOpen className="h-8 w-8 text-muted-foreground/30" />

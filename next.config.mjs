@@ -4,11 +4,11 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "books.google.com",
+        hostname: "**",
       },
       {
-        protocol: "https",
-        hostname: "covers.openlibrary.org",
+        protocol: "http",
+        hostname: "**",
       },
     ],
   },

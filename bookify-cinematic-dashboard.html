@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bookify — Hearth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<style>
+  :root{
+    --void:#120a06;
+    --deep:#1c110a;
+    --card:#2a1a10;
+    --card-line:rgba(230,190,140,.12);
+    --card-line-strong:rgba(230,190,140,.22);
+    --gold:#e0b364;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:transparent;
+    color:#f1e6d6;
+    font-family:'Inter',sans-serif;
+    overflow-x:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{font-family:'Fraunces',serif;}
+  ::selection{background:#c9695a; color:#150b06;}
+  a{color:inherit; text-decoration:none;}
+  .eyebrow{font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:#a6907c; font-weight:600;}
+
+  /* ============ NAV ============ */
+  .nav{
+    position:fixed; top:0; left:0; right:0; z-index:900;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:22px 56px;
+    background:linear-gradient(to bottom, rgba(15,9,5,.85), rgba(15,9,5,0));
+    backdrop-filter:blur(2px);
+  }
+  .nav-logo{display:flex; align-items:center; gap:10px; font-family:'Fraunces',serif; font-weight:600; font-size:19px;}
+  .nav-logo svg{width:22px; height:22px; opacity:.9;}
+  .nav-links{display:flex; gap:38px; font-size:14px; color:#c9b8a6;}
+  .nav-links a{display:flex; align-items:center; gap:7px; padding-bottom:6px; border-bottom:1px solid transparent; transition:color .25s ease;}
+  .nav-links a.active{color:#f1e6d6; border-color:#d19a52;}
+  .nav-links a:hover{color:#f1e6d6;}
+  .nav-links svg{width:15px; height:15px; opacity:.85;}
+  .nav-right{display:flex; align-items:center; gap:22px;}
+  .bell{width:19px; height:19px; opacity:.8;}
+  .avatar{
+    width:34px; height:34px; border-radius:50%;
+    background:linear-gradient(160deg,#8a5a3a,#4a2e1a);
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; font-weight:600; border:1px solid var(--card-line-strong);
+  }
+  @media (max-width:900px){ .nav{padding:18px 20px;} .nav-links{display:none;} }
+
+  /* progress rail */
+  .rail{position:fixed; right:22px; top:50%; transform:translateY(-50%); z-index:900; display:flex; flex-direction:column; gap:10px;}
+  .rail i{width:6px; height:6px; border-radius:50%; background:rgba(230,190,140,.25); display:block; transition:background .3s, transform .3s;}
+  .rail i.on{background:#e0b364; transform:scale(1.5);}
+  @media (max-width:900px){ .rail{display:none;} }
+
+  /* ============ CINEMATIC SCENE (whole dashboard lives inside this) ============ */
+  .camera-trigger{ position:relative; height:1100vh; }
+  .camera-viewport{
+    position:sticky; top:0; height:100vh; width:100%; overflow:hidden;
+    background:transparent;
+  }
+  .layer{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; will-change:transform, opacity; }
+
+  /* clouds */
+  .layer-clouds{ z-index:10; }
+  .cloud-sky{ position:absolute; inset:0; background:
+      radial-gradient(60% 50% at 85% 12%, rgba(255,196,120,.35), transparent 60%),
+      radial-gradient(90% 70% at 20% 90%, rgba(40,22,10,.9), transparent 60%),
+      linear-gradient(180deg, #2c1a0d 0%, #1c1108 55%, #100a06 100%);
+  }
+  .cloud-blob{ position:absolute; border-radius:50%;
+    background:radial-gradient(circle at 35% 35%, rgba(220,175,130,.5), rgba(120,80,45,.12) 65%, transparent 75%); filter:blur(6px); }
+  .candle-glow{ position:absolute; right:8%; bottom:14%; width:340px; height:340px; border-radius:50%;
+    background:radial-gradient(circle, rgba(255,190,110,.55), rgba(255,150,60,.14) 45%, transparent 72%); filter:blur(4px); }
+  .rain-line{ position:absolute; width:1px; background:linear-gradient(180deg, transparent, rgba(240,220,190,.18), transparent); }
+
+  .hero-copy{ position:relative; z-index:20; text-align:left; width:100%; max-width:1180px; padding:0 56px; }
+  .hero-eyebrow{font-family:'Fraunces',serif; font-style:italic; font-size:18px; color:#d8c4ac; margin-bottom:6px;}
+  .hero-title{font-size:78px; font-weight:600; color:#f6ecdd; line-height:1;}
+  .hero-title .spark{color:#e8b360; font-size:46px; vertical-align:middle;}
+  .hero-sub{margin-top:18px; font-size:16px; color:#c9b8a6; line-height:1.6; max-width:340px;}
+
+  /* bookstore exterior */
+  .layer-bookstore{ z-index:30; opacity:0; transform:scale(.28) translateY(60px); }
+  .bookstore-wrap{ position:relative; width:560px; height:560px; }
+  .bookstore-wrap svg{ width:100%; height:100%; overflow:visible; }
+
+  .layer-foreground{ z-index:40; pointer-events:none; }
+  .fg-branch{ position:absolute; top:-6%; left:-8%; width:30%; opacity:0; }
+  .fg-cobble{ position:absolute; bottom:0; left:0; right:0; height:14%; background:linear-gradient(180deg, transparent, rgba(8,5,3,.9)); }
+
+  .layer-doorglow{ z-index:35; }
+  .door-glow{ width:120px; height:170px; border-radius:60px 60px 8px 8px;
+    background:radial-gradient(60% 80% at 50% 40%, rgba(255,200,120,.9), rgba(255,150,60,.25) 60%, transparent 80%); filter:blur(14px); opacity:0; }
+
+  /* ============ PERSISTENT LIBRARY ENVIRONMENT ============ */
+  /* This backdrop stays alive and keeps drifting forward through every remaining dashboard "zone" -
+     it never resets, giving the sense of one continuous space. */
+  .env-library{ z-index:45; opacity:0; transform:scale(1.3); }
+  .env-bg{ position:absolute; inset:0; background: transparent; }
+  .env-shelf{ position:absolute; top:0; bottom:0; width:24%; opacity:.9; }
+  .env-shelf.left{ left:0; }
+  .env-shelf.right{ right:0; transform:scaleX(-1); }
+  .env-floor{ position:absolute; left:0; right:0; bottom:0; height:26%; background:linear-gradient(180deg, transparent, rgba(60,32,14,.6)); }
+  .env-dust{ position:absolute; border-radius:50%; background:rgba(230,190,140,.5); filter:blur(1px); }
+
+  /* ============ ZONES (dashboard sections staged inside the journey) ============ */
+  .zone{ position:absolute; inset:0; z-index:60; display:flex; align-items:center; justify-content:center;
+    padding:0 56px; opacity:0; transform:scale(.72) translateY(46px); will-change:transform,opacity; }
+  .zone-inner{ width:100%; max-width:1180px; }
+
+  /* --- Currently Reading: physical bookshelf --- */
+  .shelfcase{ position:relative; width:100%; }
+  .shelf-plank{ position:relative; display:flex; align-items:flex-end; gap:10px; padding:0 26px 16px; }
+  .shelf-board{ position:absolute; left:0; right:0; bottom:0; height:16px;
+    background:linear-gradient(180deg,#4a2e18,#241407); border-radius:2px;
+    box-shadow:0 14px 22px rgba(0,0,0,.55); }
+  .spine{ position:relative; border-radius:4px 4px 2px 2px; box-shadow:inset 0 0 0 1px rgba(0,0,0,.35), 0 8px 14px rgba(0,0,0,.4);
+    display:flex; align-items:flex-end; justify-content:center; padding-bottom:10px;
+    writing-mode:vertical-rl; text-orientation:mixed; font-family:'Fraunces',serif; font-size:11px; font-weight:600; color:rgba(255,255,255,.82); letter-spacing:.02em; }
+  .featured-spine{ box-shadow:inset 0 0 0 1px rgba(0,0,0,.35), 0 18px 30px rgba(0,0,0,.55); }
+  .reading-callout{
+    position:absolute; left:50%; bottom:calc(100% + 22px); transform:translateX(-50%);
+    width:min(480px, 78vw); background:linear-gradient(160deg, rgba(46,27,15,.95), rgba(24,14,7,.97));
+    border:1px solid var(--card-line-strong); border-radius:16px; padding:26px 28px;
+    box-shadow:0 30px 60px rgba(0,0,0,.55); opacity:0; }
+  .reading-callout:after{ content:""; position:absolute; left:50%; top:100%; transform:translateX(-50%);
+    border:10px solid transparent; border-top-color:#241407; }
+  .reading-callout h3{font-size:26px; font-weight:600; color:#f6ecdd; margin-bottom:4px;}
+  .reading-callout .by{font-family:'Fraunces',serif; font-style:italic; color:#c9b8a6; font-size:14px; margin-bottom:14px;}
+  .progress-row{display:flex; justify-content:space-between; font-size:12px; color:#c9b8a6; margin-bottom:6px;}
+  .progress-track{height:6px; border-radius:4px; background:rgba(255,255,255,.08); overflow:hidden; margin-bottom:16px;}
+  .progress-fill{height:100%; width:42%; background:linear-gradient(90deg,#c9695a,#e4b06a); border-radius:4px;}
+  .btn-continue{ display:inline-flex; align-items:center; gap:8px; background:#e0b364; color:#241509; font-weight:600; font-size:14px; padding:11px 20px; border-radius:9px; border:none; }
+  .shelf-caption{ text-align:center; margin-top:20px; }
+  .shelf-caption .eyebrow{ display:block; margin-bottom:6px; }
+  .shelf-caption h2{ font-family:'Fraunces',serif; font-size:28px; font-weight:600; }
+
+  /* --- Desk alcove: calendar + stats --- */
+  .desk-wrap{ background:radial-gradient(60% 100% at 50% 0%, rgba(255,190,110,.1), transparent 70%); border-radius:20px; padding:26px; }
+  .grid-2{display:grid; grid-template-columns:1.35fr 1fr; gap:24px;}
+  .card{ background:var(--card); border:1px solid var(--card-line); border-radius:16px; padding:32px; }
+  .card-head{display:flex; align-items:center; gap:10px; margin-bottom:22px;}
+  .card-head svg{width:16px; height:16px; opacity:.75;}
+  .cal-title{font-family:'Fraunces',serif; font-size:24px; font-weight:600; margin-bottom:18px;}
+  .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; text-align:center;}
+  .cal-dow{font-size:11px; letter-spacing:.08em; color:#8a7a68; padding-bottom:8px;}
+  .cal-day{font-size:13px; color:#d8c4ac; padding:9px 0; border-radius:8px;}
+  .cal-day.blank{visibility:hidden;}
+  .cal-day.read{border:1px solid #c9695a; color:#f1c9bc;}
+  .cal-day.today{background:#5a3a20; color:#f6ecdd; font-weight:700;}
+  .cal-legend{display:flex; gap:20px; margin-top:16px; font-size:12px; color:#9c8a76;}
+  .cal-legend span{display:inline-flex; align-items:center; gap:6px;}
+  .dot{width:9px; height:9px; border-radius:50%; border:1.5px solid #c9695a;}
+  .dot.miss{border-color:#5c4a3a;}
+  .streak-box{ position:absolute; top:32px; right:32px; background:rgba(0,0,0,.28); border:1px solid var(--card-line);
+    border-radius:12px; padding:16px 20px; text-align:center; width:118px; }
+  .streak-box .flame{font-size:22px;}
+  .streak-box .num{font-family:'Fraunces',serif; font-size:22px; font-weight:700;}
+  .streak-box .lbl{font-style:italic; font-size:12px; color:#c9b8a6; margin-bottom:6px;}
+  .streak-box .sub{font-size:11px; color:#9c8a76; margin-top:6px;}
+  .cal-card{position:relative;}
+  .stat-row{display:flex; align-items:center; gap:16px; padding:18px 0; border-bottom:1px solid var(--card-line); flex-wrap:wrap;}
+  .stat-row:last-of-type{border-bottom:none;}
+  .stat-icon{width:40px; height:40px; border-radius:10px; background:rgba(224,179,100,.1); display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .stat-icon svg{width:18px; height:18px; opacity:.85;}
+  .stat-label{font-size:14px; color:#d8c4ac; flex:1;}
+  .stat-value{font-family:'Fraunces',serif; font-size:26px; font-weight:700;}
+  .stat-unit{font-size:12px; color:#9c8a76; margin-left:4px;}
+  .goal-bar{height:6px; border-radius:4px; background:rgba(255,255,255,.08); margin-top:14px; overflow:hidden; width:100%;}
+  .goal-fill{height:100%; width:2%; background:#e0b364;}
+
+  /* --- Identity nook --- */
+  .identity-card{display:flex; align-items:center; gap:32px; position:relative;}
+  .identity-card .view-all{position:absolute; top:32px; right:32px; font-size:13px; color:#c9b8a6;}
+  .identity-icon{ width:110px; height:110px; border-radius:14px; background:#0e0805; border:1px solid var(--card-line); flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; }
+  .identity-icon svg{width:44px; height:44px; opacity:.8;}
+  .identity-body h3{font-family:'Fraunces',serif; font-size:28px; font-weight:600; margin-bottom:10px;}
+  .tag-row{display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap;}
+  .tag{font-size:11px; letter-spacing:.05em; text-transform:uppercase; padding:6px 12px; border:1px solid var(--card-line-strong); border-radius:20px; color:#d8c4ac;}
+  .trait-bar{display:flex; height:6px; border-radius:4px; overflow:hidden; margin-bottom:14px;}
+  .trait-bar span{height:100%;}
+  .identity-body p{font-size:14px; color:#a6907c; font-style:italic; font-family:'Fraunces',serif; max-width:520px;}
+
+  /* --- Made For You: second shelf --- */
+  .section-head{display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:22px;}
+  .section-head h2{font-family:'Fraunces',serif; font-size:26px; font-weight:600;}
+  .section-head p{font-size:13px; font-style:italic; color:#9c8a76; margin-top:4px;}
+  .section-head .see-all{font-size:13px; color:#c9b8a6;}
+  .book-row{display:flex; align-items:flex-end; gap:16px; justify-content:center;}
+  .book{ text-align:center; }
+  .book-cover{ width:104px; border-radius:5px 5px 3px 3px; box-shadow:0 16px 28px rgba(0,0,0,.45);
+    display:flex; flex-direction:column; justify-content:space-between; padding:10px; }
+  .book-cover .bt{font-family:'Fraunces',serif; font-weight:700; font-size:12px; color:#fff; line-height:1.05;}
+  .book-cover .ba{font-size:8px; letter-spacing:.05em; color:rgba(255,255,255,.85); text-transform:uppercase;}
+  .book-name{font-size:12px; font-weight:600; color:#e8dcc8; margin-top:8px;}
+  .book-author{font-size:10px; color:#9c8a76; text-transform:uppercase; letter-spacing:.03em;}
+  .book-rating{font-size:11px; color:#e0b364; margin-top:2px;}
+
+  /* --- Final quote window --- */
+  .quote-card{ text-align:center; padding:60px 40px; border:1px solid var(--card-line); border-radius:18px;
+    background:radial-gradient(70% 90% at 50% 0%, rgba(255,190,110,.12), transparent 70%); }
+  .quote-mark{font-family:'Fraunces',serif; font-size:44px; color:#e0b364; line-height:1;}
+  .quote-text{font-family:'Fraunces',serif; font-style:italic; font-size:30px; max-width:760px; margin:18px auto 22px; line-height:1.35; color:#f1e6d6;}
+  .quote-author{font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:#9c8a76;}
+  .quote-rule{display:inline-block; width:36px; height:1px; background:#5c4a3a; margin:0 12px; vertical-align:middle;}
+
+  @media (max-width:760px){
+    .hero-title{font-size:44px;} .hero-copy{padding:0 22px;}
+    .grid-2{grid-template-columns:1fr;}
+    .identity-card{flex-direction:column; text-align:center;}
+    .zone{padding:0 22px;}
+    .book-row{flex-wrap:wrap;}
+  }
+</style>
+</head>
+<body>
+
+
+
+
+
+<section class="camera-trigger" id="cameraTrigger">
+  <div class="camera-viewport">
+
+    <div class="layer layer-clouds" id="layerClouds">
+      <div class="cloud-sky"></div>
+      <div class="candle-glow"></div>
+    </div>
+
+    
+      <h1 class="hero-title">Reader <span class="spark">&#10022;</span></h1>
+      <p class="hero-sub">Every page you read,<br>shapes who you become.</p>
+    </div>
+
+    <div class="layer layer-foreground" id="layerForeground">
+      <svg class="fg-branch" viewBox="0 0 300 220">
+        <path d="M0 0 C40 20 70 40 90 90 C60 80 30 70 0 40 Z" fill="#0b0603" opacity=".85"/>
+        <path d="M10 10 C60 10 100 30 130 70" stroke="#0b0603" stroke-width="6" fill="none" opacity=".85"/>
+      </svg>
+      <div class="fg-cobble"></div>
+    </div>
+
+    <div class="layer layer-bookstore" id="layerBookstore">
+      <div class="bookstore-wrap">
+        <svg viewBox="0 0 400 460" id="bookstoreSvg">
+          <rect x="60" y="150" width="280" height="270" fill="#2a180d"/>
+          <polygon points="40,150 200,50 360,150" fill="#180d06"/>
+          <rect x="185" y="60" width="30" height="46" fill="#2a180d"/>
+          <polygon points="180,60 200,40 220,60" fill="#120a05"/>
+          <rect x="76" y="176" width="70" height="80" rx="3" fill="#e6b568" opacity=".9"/>
+          <rect x="76" y="176" width="70" height="80" rx="3" fill="none" stroke="#120a05" stroke-width="4"/>
+          <line x1="111" y1="176" x2="111" y2="256" stroke="#120a05" stroke-width="3"/>
+          <line x1="76" y1="216" x2="146" y2="216" stroke="#120a05" stroke-width="3"/>
+          <rect x="254" y="176" width="70" height="80" rx="3" fill="#e6b568" opacity=".9"/>
+          <rect x="254" y="176" width="70" height="80" rx="3" fill="none" stroke="#120a05" stroke-width="4"/>
+          <line x1="289" y1="176" x2="289" y2="256" stroke="#120a05" stroke-width="3"/>
+          <line x1="254" y1="216" x2="324" y2="216" stroke="#120a05" stroke-width="3"/>
+          <rect x="166" y="290" width="68" height="130" rx="34" fill="#160c05" id="doorRect"/>
+          <rect x="166" y="290" width="68" height="130" rx="34" fill="none" stroke="#0d0703" stroke-width="4"/>
+          <circle cx="222" cy="356" r="3" fill="#e0b364"/>
+          <rect x="55" y="415" width="290" height="16" fill="#160c05"/>
+          <g id="signGroup">
+            <rect x="24" y="176" width="6" height="60" fill="#120a05"/>
+            <rect x="-56" y="176" width="86" height="34" rx="3" fill="#3a2412" stroke="#120a05" stroke-width="3"/>
+            <text x="-13" y="197" text-anchor="middle" font-family="Fraunces, serif" font-size="10" fill="#e6b568" font-weight="700">TOWN</text>
+            <text x="-13" y="208" text-anchor="middle" font-family="Fraunces, serif" font-size="8" fill="#e6b568">BOOKSTORE</text>
+          </g>
+          <circle cx="90" cy="120" r="3" fill="#f0c988" opacity=".9"/>
+          <circle cx="140" cy="105" r="3" fill="#f0c988" opacity=".9"/>
+          <circle cx="200" cy="95" r="3" fill="#f0c988" opacity=".9"/>
+          <circle cx="260" cy="105" r="3" fill="#f0c988" opacity=".9"/>
+          <circle cx="310" cy="120" r="3" fill="#f0c988" opacity=".9"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="layer layer-doorglow" id="layerDoorglow">
+      <div class="door-glow" id="doorGlow"></div>
+    </div>
+
+    <!-- persistent environment: stays alive through every remaining zone -->
+    <div class="layer env-library" id="envLibrary">
+      <div class="env-bg"></div>
+      <svg class="env-shelf left" viewBox="0 0 200 800" preserveAspectRatio="xMinYMid slice">
+        <rect width="200" height="800" fill="#180d06"/>
+        <g fill="#7a5a38">
+          <rect x="10" y="40" width="30" height="90" rx="2"/><rect x="46" y="30" width="28" height="100" rx="2" fill="#8a6a44"/>
+          <rect x="80" y="50" width="24" height="80" rx="2" fill="#6a4a2c"/><rect x="10" y="180" width="26" height="94" rx="2" fill="#8a6a44"/>
+          <rect x="42" y="170" width="30" height="104" rx="2" fill="#6a4a2c"/><rect x="10" y="320" width="30" height="90" rx="2" fill="#6a4a2c"/>
+          <rect x="46" y="310" width="28" height="100" rx="2" fill="#8a6a44"/><rect x="10" y="460" width="30" height="90" rx="2" fill="#8a6a44"/>
+          <rect x="46" y="450" width="28" height="100" rx="2" fill="#6a4a2c"/><rect x="10" y="600" width="30" height="90" rx="2" fill="#6a4a2c"/>
+        </g>
+      </svg>
+      <svg class="env-shelf right" viewBox="0 0 200 800" preserveAspectRatio="xMinYMid slice">
+        <rect width="200" height="800" fill="#180d06"/>
+        <g fill="#7a5a38">
+          <rect x="10" y="40" width="30" height="90" rx="2"/><rect x="46" y="30" width="28" height="100" rx="2" fill="#8a6a44"/>
+          <rect x="80" y="50" width="24" height="80" rx="2" fill="#6a4a2c"/><rect x="10" y="180" width="26" height="94" rx="2" fill="#8a6a44"/>
+          <rect x="42" y="170" width="30" height="104" rx="2" fill="#6a4a2c"/><rect x="10" y="320" width="30" height="90" rx="2" fill="#6a4a2c"/>
+          <rect x="46" y="310" width="28" height="100" rx="2" fill="#8a6a44"/><rect x="10" y="460" width="30" height="90" rx="2" fill="#8a6a44"/>
+          <rect x="46" y="450" width="28" height="100" rx="2" fill="#6a4a2c"/><rect x="10" y="600" width="30" height="90" rx="2" fill="#6a4a2c"/>
+        </g>
+      </svg>
+      <div class="env-floor"></div>
+    </div>
+
+    
+
+    
+          <div class="card">
+            <div class="card-head"><span class="eyebrow">This month</span></div>
+            <div class="stat-row">
+              <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#e0b364" stroke-width="1.8"><path d="M4 5c4-1.5 6.5-1.5 8 0v14c-1.5-1.5-4-1.5-8 0V5z"/><path d="M20 5c-4-1.5-6.5-1.5-8 0v14c1.5-1.5 4-1.5 8 0V5z"/></svg></div>
+              <div class="stat-label">Books finished</div>
+              <div><span class="stat-value">0</span><span class="stat-unit">BOOKS</span></div>
+            </div>
+            <div class="stat-row">
+              <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#e0b364" stroke-width="1.8"><path d="M6 3h9l5 5v13H6z"/><path d="M9 12h6M9 16h6"/></svg></div>
+              <div class="stat-label">Pages read</div>
+              <div><span class="stat-value">10</span><span class="stat-unit">PAGES</span></div>
+            </div>
+            <div class="stat-row">
+              <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#e0b364" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg></div>
+              <div class="stat-label">Monthly goal</div>
+              <div><span class="stat-value" style="font-size:20px;">2%</span></div>
+              <div class="goal-bar"><div class="goal-fill"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    
+    </div>
+
+    
+      </div>
+    </div>
+
+    
+    </div>
+
+  </div>
+</section>
+
+<script>
+gsap.registerPlugin(ScrollTrigger);
+
+function seedClouds(){
+  const layer = document.getElementById('layerClouds');
+  for(let i=0;i<9;i++){
+    const b = document.createElement('div');
+    b.className = 'cloud-blob';
+    const w = 140 + Math.random()*260;
+    b.style.width = w+'px'; b.style.height = (w*0.55)+'px';
+    b.style.left = (Math.random()*100)+'%'; b.style.top = (Math.random()*70)+'%';
+    layer.appendChild(b);
+    gsap.to(b, { x:(Math.random()>0.5?1:-1)*(40+Math.random()*60), duration:14+Math.random()*10, repeat:-1, yoyo:true, ease:'sine.inOut' });
+  }
+  for(let i=0;i<26;i++){
+    const r = document.createElement('div');
+    r.className = 'rain-line';
+    r.style.left = (Math.random()*100)+'%'; r.style.top = (Math.random()*100)+'%'; r.style.height = (30+Math.random()*70)+'px';
+    layer.appendChild(r);
+  }
+}
+seedClouds();
+
+function seedDust(){
+  const layer = document.getElementById('envLibrary');
+  for(let i=0;i<18;i++){
+    const d = document.createElement('div');
+    d.className = 'env-dust';
+    const s = 2+Math.random()*3;
+    d.style.width = s+'px'; d.style.height = s+'px';
+    d.style.left = (Math.random()*100)+'%'; d.style.top = (Math.random()*100)+'%';
+    d.style.opacity = (0.15+Math.random()*0.35).toFixed(2);
+    layer.appendChild(d);
+    gsap.to(d, { y:-40-Math.random()*60, x:(Math.random()>0.5?1:-1)*20, duration:8+Math.random()*8, repeat:-1, yoyo:true, ease:'sine.inOut' });
+  }
+}
+seedDust();
+
+
+
+const tl = gsap.timeline({
+  scrollTrigger:{ trigger:'#cameraTrigger', start:'top top', end:'bottom bottom', scrub:0.6, onUpdate:updateRail }
+});
+
+/* -------- intro: clouds -> bookstore -> approach -> entrance -------- */
+
+tl.to('#layerClouds', {opacity:0.55, duration:70}, 10);
+
+tl.fromTo('#layerBookstore', {opacity:0, scale:0.28, y:60}, {opacity:1, scale:0.55, y:20, duration:20}, 18);
+tl.to('#layerBookstore', {scale:1.5, y:-10, duration:25}, 40);
+tl.fromTo('.fg-branch', {opacity:0, x:0, y:0}, {opacity:.9, x:-60, y:-30, duration:14}, 40);
+tl.to('.fg-branch', {opacity:0, x:-120, y:-60, duration:11}, 54);
+tl.to('.fg-cobble', {opacity:0.4, duration:25}, 40);
+
+tl.to('#layerBookstore', {scale:5.5, y:-180, duration:17}, 65);
+tl.to('#signGroup', {opacity:0, duration:8}, 65);
+tl.to('#doorGlow', {opacity:1, scale:1.4, duration:17}, 65);
+tl.to('#layerDoorglow', {scale:2.4, duration:17}, 65);
+
+tl.to('#layerBookstore', {scale:11, opacity:0, y:-260, duration:18}, 82);
+tl.to('#layerDoorglow', {scale:5, opacity:0, duration:10}, 82);
+tl.to('#layerClouds', {opacity:0, duration:10}, 82);
+
+/* -------- environment establishes and then persists, continuously drifting forward -------- */
+tl.fromTo('#envLibrary', {opacity:0, scale:1.3}, {opacity:1, scale:1, duration:20}, 82);
+tl.to('#envLibrary', {scale:1.55, duration:1000, ease:'none'}, 100);
+
+
+
+/* rail indicator */
+const railDots = document.querySelectorAll('#rail i');
+const railStops = [0, 65, 100, 240, 355, 458, 566];
+function updateRail(){
+  const p = tl.scrollTrigger.progress * tl.duration();
+  let idx = 0;
+  for(let i=0;i<railStops.length;i++){ if(p >= railStops[i]) idx = i; }
+  railDots.forEach((d,i)=> d.classList.toggle('on', i===idx));
+}
+</script>
+</body>
+</html>

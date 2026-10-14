@@ -1,9 +1,13 @@
 import { Sparkles } from "lucide-react";
+import { getCurrentUser } from "@/lib/auth";
 
-export default function PersonalityPage() {
+export default async function PersonalityPage() {
+  const user = await getCurrentUser();
+  const isReaderAcc = user?.email === "reader@bookify.com";
+
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
-      <h1 className="text-3xl font-bold text-foreground">Personality Evolution</h1>
+    <div className="max-w-2xl mx-auto px-4 pt-20 md:pt-24 pb-16 space-y-6">
+      <h1 className="text-3xl font-bold font-serif text-[#f0dfc0]">Personality Evolution</h1>
       <p className="text-sm text-muted-foreground">Who you&apos;re becoming as a reader, over time.</p>
 
       {/* Current archetype */}
@@ -11,9 +15,13 @@ export default function PersonalityPage() {
         <div className="w-16 h-16 rounded-2xl bg-primary/20 flex items-center justify-center mx-auto mb-4">
           <Sparkles className="h-8 w-8 text-primary/60" />
         </div>
-        <h2 className="text-2xl font-bold text-foreground mb-2">The Emerging Reader</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-2">
+          {isReaderAcc ? "The Midnight Librarian" : "The Emerging Reader"}
+        </h2>
         <p className="text-sm text-muted-foreground max-w-sm mx-auto">
-          Your reading identity is just beginning to form. Every book you finish adds a new layer to your story.
+          {isReaderAcc
+            ? "You are drawn to dark academia and the mysteries of the universe. Your reading patterns show deep dives into intricate worlds."
+            : "Your reading identity is just beginning to form. Every book you finish adds a new layer to your story."}
         </p>
       </div>
 

@@ -1,8 +1,7 @@
 import { Search, BookOpen } from "lucide-react";
 
 const moods = [
-  "Cozy", "Adventure", "Dark Academia", "Rainy Day",
-  "Romantic", "Mysterious", "Motivated", "Hopeful",
+  "Cozy", "Adventure", "Romantic", "Mysterious", "Motivated", "Hopeful",
 ];
 
 const rows = [
@@ -15,10 +14,13 @@ const rows = [
 
 export default function DiscoverLoading() {
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-8 animate-pulse">
+    <div className="max-w-5xl mx-auto px-4 pt-20 md:pt-24 pb-16 space-y-8 animate-pulse">
       {/* Header + Search */}
       <div className="flex flex-col gap-4">
-        <h1 className="text-3xl font-bold text-foreground">Discover</h1>
+        <div>
+          <h1 className="text-3xl font-bold font-serif text-[#f0dfc0]">Town Bookstore</h1>
+          <p className="text-xs text-[#a6907c] mt-1">Browse new arrivals, curated collections, and community favorites</p>
+        </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <div className="w-full h-[42px] rounded-xl bg-muted/50 border border-border" />

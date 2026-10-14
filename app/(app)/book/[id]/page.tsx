@@ -4,14 +4,42 @@ import Link from "next/link";
 import { getBookDetails, fetchUniqueBooksByCategory } from "@/lib/google-books";
 import { AddToLibraryButton } from "@/components/book/add-to-library-button";
 import { notFound } from "next/navigation";
+import prisma from "@/lib/prisma";
 
 export default async function BookDetailPage({ params }: { params: { id: string } }) {
-  let book;
+  let book: any;
   try {
+    // Try fetching from Google Books first
     book = await getBookDetails(params.id);
   } catch (error) {
-    console.error("Error fetching book details:", error);
-    notFound();
+    // Fallback: check the local database for custom/seeded books
+    const localBook = await prisma.book.findFirst({
+      where: {
+        OR: [{ id: params.id }, { externalId: params.id }]
+      },
+      include: {
+        authors: { include: { author: true } },
+        genres: { include: { genre: true } }
+      }
+    });
+
+    if (!localBook) {
+      notFound();
+    }
+
+    // Map local book to the expected GoogleBookVolume format
+    book = {
+      id: localBook.id,
+      volumeInfo: {
+        title: localBook.title,
+        authors: localBook.authors.map((a: any) => a.author.name),
+        description: localBook.description || "No description available.",
+        imageLinks: localBook.coverUrl ? { thumbnail: localBook.coverUrl } : null,
+        pageCount: localBook.pageCount,
+        categories: localBook.genres.map((g: any) => g.genre.name),
+        averageRating: 0,
+      }
+    };
   }
 
   const { volumeInfo } = book;
@@ -38,7 +66,7 @@ export default async function BookDetailPage({ params }: { params: { id: string 
   );
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="max-w-4xl mx-auto px-4 pt-20 md:pt-24 pb-16">
       <div className="flex flex-col md:flex-row gap-8">
         {/* Cover */}
         <div className="shrink-0 mx-auto md:mx-0">
@@ -74,7 +102,7 @@ export default async function BookDetailPage({ params }: { params: { id: string 
 
           {categories.length > 0 && (
             <div className="flex gap-2 flex-wrap">
-              {categories.slice(0, 3).map((g) => (
+              {categories.slice(0, 3).map((g: string) => (
                 <span key={g} className="px-3 py-1 rounded-full glass text-xs text-muted-foreground">{g}</span>
               ))}
             </div>

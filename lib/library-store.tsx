@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { getUserLibraryAction, addBookToLibraryAction, removeBookFromLibraryAction, updateLibraryEntryAction } from "@/app/actions/library";
 
 // Mirrors ReadingStatus in schema.prisma
 export type ReadingStatus =
@@ -28,73 +29,123 @@ interface LibraryContextValue {
   updateStatus: (bookId: string, status: ReadingStatus) => void;
   isInLibrary: (bookId: string) => boolean;
   getEntry: (bookId: string) => LibraryEntry | undefined;
+  loading: boolean;
 }
-
-// NOTE: this is a temporary client-side store. Once the DB is connected,
-// replace the localStorage read/writes below with calls to
-// POST/PATCH /api/v1/library — the addBook/removeBook/updateStatus
-// function signatures are written to match that future API shape so
-// nothing calling useLibrary() needs to change, only this file's internals.
-const STORAGE_KEY = "bookify:library";
 
 const LibraryContext = createContext<LibraryContextValue | null>(null);
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
   const [library, setLibrary] = useState<Record<string, LibraryEntry>>({});
-  const [hydrated, setHydrated] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // Load from localStorage on mount only (avoids SSR/hydration mismatch)
-  useEffect(() => {
+  // Fetch library entries from database Server Action
+  const fetchLibrary = async () => {
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) setLibrary(JSON.parse(raw));
+      const res = await getUserLibraryAction("");
+      if (res.success && res.data) {
+        const mapped: Record<string, LibraryEntry> = {};
+        for (const entry of res.data) {
+          const key = entry.book.externalId || entry.book.id;
+          mapped[key] = {
+            bookId: key,
+            title: entry.book.title,
+            author: entry.book.authors.map((a: any) => a.author.name).join(", "),
+            coverUrl: entry.book.coverUrl || undefined,
+            status: entry.status,
+            addedAt: new Date(entry.addedAt).toISOString(),
+          };
+        }
+        setLibrary(mapped);
+      }
     } catch (err) {
-      console.error("Failed to load library from storage:", err);
+      console.error("Failed to fetch library from database:", err);
     } finally {
-      setHydrated(true);
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchLibrary();
   }, []);
 
-  // Persist on every change, once hydrated
-  useEffect(() => {
-    if (!hydrated) return;
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(library));
-    } catch (err) {
-      console.error("Failed to save library to storage:", err);
-    }
-  }, [library, hydrated]);
-
-  function addBook(
+  async function addBook(
     book: Omit<LibraryEntry, "status" | "addedAt"> & { status?: ReadingStatus }
   ) {
+    const status = book.status ?? "WANT_TO_READ";
+    // Optimistic update
+    const newEntry: LibraryEntry = {
+      bookId: book.bookId,
+      title: book.title,
+      author: book.author,
+      coverUrl: book.coverUrl,
+      status,
+      addedAt: new Date().toISOString(),
+    };
     setLibrary((prev) => ({
       ...prev,
-      [book.bookId]: {
-        bookId: book.bookId,
+      [book.bookId]: newEntry,
+    }));
+
+    try {
+      const result = await addBookToLibraryAction("", book.bookId, status, {
         title: book.title,
         author: book.author,
         coverUrl: book.coverUrl,
-        status: book.status ?? "WANT_TO_READ",
-        addedAt: new Date().toISOString(),
-      },
-    }));
+      });
+      if (!result.success) {
+        console.error("Server failed to add book to library:", result.error);
+        fetchLibrary(); // Rollback/Sync
+      } else {
+        fetchLibrary(); // Pull fresh database state
+      }
+    } catch (err) {
+      console.error("Failed to add book to library:", err);
+      fetchLibrary(); // Rollback/Sync
+    }
   }
 
-  function removeBook(bookId: string) {
+  async function removeBook(bookId: string) {
+    // Optimistic update
     setLibrary((prev) => {
       const next = { ...prev };
       delete next[bookId];
       return next;
     });
+
+    try {
+      const result = await removeBookFromLibraryAction("", bookId);
+      if (!result.success) {
+        console.error("Server failed to remove book:", result.error);
+        fetchLibrary(); // Rollback/Sync
+      } else {
+        fetchLibrary(); // Pull fresh database state
+      }
+    } catch (err) {
+      console.error("Failed to remove book:", err);
+      fetchLibrary(); // Rollback/Sync
+    }
   }
 
-  function updateStatus(bookId: string, status: ReadingStatus) {
+  async function updateStatus(bookId: string, status: ReadingStatus) {
+    // Optimistic update
     setLibrary((prev) => {
       const existing = prev[bookId];
       if (!existing) return prev;
       return { ...prev, [bookId]: { ...existing, status } };
     });
+
+    try {
+      const result = await updateLibraryEntryAction("", bookId, { status });
+      if (!result.success) {
+        console.error("Server failed to update status:", result.error);
+        fetchLibrary(); // Rollback/Sync
+      } else {
+        fetchLibrary(); // Pull fresh database state
+      }
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      fetchLibrary(); // Rollback/Sync
+    }
   }
 
   function isInLibrary(bookId: string) {
@@ -107,7 +158,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
 
   return (
     <LibraryContext.Provider
-      value={{ library, addBook, removeBook, updateStatus, isInLibrary, getEntry }}
+      value={{ library, addBook, removeBook, updateStatus, isInLibrary, getEntry, loading }}
     >
       {children}
     </LibraryContext.Provider>

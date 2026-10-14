@@ -18,7 +18,9 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   const title = searchParams.title ? decodeURIComponent(searchParams.title) : rawQuery;
 
   // Reconstruct the same search options that the discover row used
-  const category = searchParams.category ?? rawQuery;
+  const category = searchParams.category !== undefined 
+    ? searchParams.category 
+    : (rawQuery === "trending-now" || rawQuery === "popular-this-week" ? "" : rawQuery);
   const searchOptions: { q?: string; orderBy?: "relevance" | "newest" } = {};
   if (searchParams.q) searchOptions.q = searchParams.q;
   if (searchParams.orderBy) searchOptions.orderBy = searchParams.orderBy;
@@ -26,12 +28,12 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   const { items } = await fetchUniqueBooksByCategory(category, 30, new Set(), searchOptions);
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
+    <div className="max-w-5xl mx-auto px-4 pt-20 md:pt-24 pb-16">
       <Link
         href="/discover"
         className="text-sm text-[#8a6040] hover:text-[#c9a87a] transition-colors mb-6 inline-flex items-center gap-1.5"
       >
-        ← Back to Discover
+        ← Back to Town Bookstore
       </Link>
       <h1 className="text-3xl font-bold text-[#f0dfc0] mb-6 mt-2">{title}</h1>
 

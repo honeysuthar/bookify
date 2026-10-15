@@ -1,7 +1,15 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { getUserLibraryAction, addBookToLibraryAction, removeBookFromLibraryAction, updateLibraryEntryAction } from "@/app/actions/library";
+import { useSession } from "next-auth/react";
+import {
+  getUserLibraryAction,
+  addBookToLibraryAction,
+  removeBookFromLibraryAction,
+  updateLibraryEntryAction,
+  getUserFavoritesAction,
+  toggleFavoriteAction,
+} from "@/app/actions/library";
 
 // Mirrors ReadingStatus in schema.prisma
 export type ReadingStatus =
@@ -20,8 +28,17 @@ export interface LibraryEntry {
   addedAt: string;
 }
 
+export interface FavoriteEntry {
+  bookId: string;
+  title: string;
+  author: string;
+  coverUrl?: string;
+  addedAt: string;
+}
+
 interface LibraryContextValue {
   library: Record<string, LibraryEntry>;
+  favorites: Record<string, FavoriteEntry>;
   addBook: (
     book: Omit<LibraryEntry, "status" | "addedAt"> & { status?: ReadingStatus }
   ) => void;
@@ -29,50 +46,83 @@ interface LibraryContextValue {
   updateStatus: (bookId: string, status: ReadingStatus) => void;
   isInLibrary: (bookId: string) => boolean;
   getEntry: (bookId: string) => LibraryEntry | undefined;
+  isFavorite: (bookId: string) => boolean;
+  toggleFavorite: (book: {
+    bookId: string;
+    title: string;
+    author?: string;
+    coverUrl?: string;
+  }) => Promise<boolean>;
   loading: boolean;
 }
 
 const LibraryContext = createContext<LibraryContextValue | null>(null);
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
+  const { data: session, status } = useSession();
   const [library, setLibrary] = useState<Record<string, LibraryEntry>>({});
+  const [favorites, setFavorites] = useState<Record<string, FavoriteEntry>>({});
   const [loading, setLoading] = useState(true);
 
-  // Fetch library entries from database Server Action
-  const fetchLibrary = async () => {
+  // Fetch library entries and favorites from database Server Action
+  const fetchAll = async () => {
     try {
-      const res = await getUserLibraryAction("");
-      if (res.success && res.data) {
-        const mapped: Record<string, LibraryEntry> = {};
-        for (const entry of res.data) {
+      const [libRes, favRes] = await Promise.all([
+        getUserLibraryAction(""),
+        getUserFavoritesAction(""),
+      ]);
+
+      if (libRes.success && libRes.data) {
+        const mappedLib: Record<string, LibraryEntry> = {};
+        for (const entry of libRes.data) {
           const key = entry.book.externalId || entry.book.id;
-          mapped[key] = {
+          mappedLib[key] = {
             bookId: key,
             title: entry.book.title,
-            author: entry.book.authors.map((a: any) => a.author.name).join(", "),
+            author: entry.book.authors?.map((a: any) => a.author.name).join(", ") || "",
             coverUrl: entry.book.coverUrl || undefined,
             status: entry.status,
             addedAt: new Date(entry.addedAt).toISOString(),
           };
         }
-        setLibrary(mapped);
+        setLibrary(mappedLib);
+      }
+
+      if (favRes.success && favRes.data) {
+        const mappedFav: Record<string, FavoriteEntry> = {};
+        for (const fav of favRes.data) {
+          const key = fav.book.externalId || fav.book.id;
+          mappedFav[key] = {
+            bookId: key,
+            title: fav.book.title,
+            author: fav.book.authors?.map((a: any) => a.author.name).join(", ") || "",
+            coverUrl: fav.book.coverUrl || undefined,
+            addedAt: new Date(fav.createdAt).toISOString(),
+          };
+        }
+        setFavorites(mappedFav);
       }
     } catch (err) {
-      console.error("Failed to fetch library from database:", err);
+      console.error("Failed to fetch library/favorites:", err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchLibrary();
-  }, []);
+    if (status === "authenticated") {
+      fetchAll();
+    } else if (status === "unauthenticated") {
+      setLibrary({});
+      setFavorites({});
+      setLoading(false);
+    }
+  }, [status, session?.user?.id]);
 
   async function addBook(
     book: Omit<LibraryEntry, "status" | "addedAt"> & { status?: ReadingStatus }
   ) {
     const status = book.status ?? "WANT_TO_READ";
-    // Optimistic update
     const newEntry: LibraryEntry = {
       bookId: book.bookId,
       title: book.title,
@@ -94,18 +144,17 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       });
       if (!result.success) {
         console.error("Server failed to add book to library:", result.error);
-        fetchLibrary(); // Rollback/Sync
+        fetchAll();
       } else {
-        fetchLibrary(); // Pull fresh database state
+        fetchAll();
       }
     } catch (err) {
       console.error("Failed to add book to library:", err);
-      fetchLibrary(); // Rollback/Sync
+      fetchAll();
     }
   }
 
   async function removeBook(bookId: string) {
-    // Optimistic update
     setLibrary((prev) => {
       const next = { ...prev };
       delete next[bookId];
@@ -116,18 +165,17 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       const result = await removeBookFromLibraryAction("", bookId);
       if (!result.success) {
         console.error("Server failed to remove book:", result.error);
-        fetchLibrary(); // Rollback/Sync
+        fetchAll();
       } else {
-        fetchLibrary(); // Pull fresh database state
+        fetchAll();
       }
     } catch (err) {
       console.error("Failed to remove book:", err);
-      fetchLibrary(); // Rollback/Sync
+      fetchAll();
     }
   }
 
   async function updateStatus(bookId: string, status: ReadingStatus) {
-    // Optimistic update
     setLibrary((prev) => {
       const existing = prev[bookId];
       if (!existing) return prev;
@@ -138,13 +186,13 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       const result = await updateLibraryEntryAction("", bookId, { status });
       if (!result.success) {
         console.error("Server failed to update status:", result.error);
-        fetchLibrary(); // Rollback/Sync
+        fetchAll();
       } else {
-        fetchLibrary(); // Pull fresh database state
+        fetchAll();
       }
     } catch (err) {
       console.error("Failed to update status:", err);
-      fetchLibrary(); // Rollback/Sync
+      fetchAll();
     }
   }
 
@@ -156,9 +204,68 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     return library[bookId];
   }
 
+  function isFavorite(bookId: string) {
+    return !!favorites[bookId];
+  }
+
+  async function toggleFavorite(book: {
+    bookId: string;
+    title: string;
+    author?: string;
+    coverUrl?: string;
+  }): Promise<boolean> {
+    const currentlyFav = !!favorites[book.bookId];
+
+    // Optimistic UI update
+    setFavorites((prev) => {
+      const next = { ...prev };
+      if (currentlyFav) {
+        delete next[book.bookId];
+      } else {
+        next[book.bookId] = {
+          bookId: book.bookId,
+          title: book.title,
+          author: book.author || "",
+          coverUrl: book.coverUrl,
+          addedAt: new Date().toISOString(),
+        };
+      }
+      return next;
+    });
+
+    try {
+      const res = await toggleFavoriteAction("", book.bookId, {
+        title: book.title,
+        author: book.author,
+        coverUrl: book.coverUrl,
+      });
+
+      if (res.success && res.data) {
+        return res.data.favorited;
+      }
+      fetchAll();
+      return currentlyFav;
+    } catch (err) {
+      console.error("Failed to toggle favorite:", err);
+      fetchAll();
+      return currentlyFav;
+    }
+  }
+
   return (
     <LibraryContext.Provider
-      value={{ library, addBook, removeBook, updateStatus, isInLibrary, getEntry, loading }}
+      value={{
+        library,
+        favorites,
+        addBook,
+        removeBook,
+        updateStatus,
+        isInLibrary,
+        getEntry,
+        isFavorite,
+        toggleFavorite,
+        loading,
+      }}
     >
       {children}
     </LibraryContext.Provider>

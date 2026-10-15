@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { BookOpen, Plus, ChevronDown, Check } from "lucide-react";
+import { BookOpen, Plus, ChevronDown, Check, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import Image from "next/image";
 import { useLibrary, ReadingStatus } from "@/lib/library-store";
+import { FavoriteButton } from "@/components/book/favorite-button";
+
+type ShelfTab = ReadingStatus | "FAVORITES";
 
 const shelves: { label: string; status: ReadingStatus }[] = [
   { label: "Currently Reading", status: "CURRENTLY_READING" },
@@ -16,30 +18,28 @@ const shelves: { label: string; status: ReadingStatus }[] = [
 ];
 
 export default function LibraryPage() {
-  const { library, updateStatus, removeBook, loading } = useLibrary();
-  const [activeTab, setActiveTab] = useState<ReadingStatus>("CURRENTLY_READING");
+  const { library, favorites, updateStatus, removeBook, loading } = useLibrary();
+  const [activeTab, setActiveTab] = useState<ShelfTab>("CURRENTLY_READING");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [userPickedTab, setUserPickedTab] = useState(false);
   const [brokenCovers, setBrokenCovers] = useState<Set<string>>(new Set());
 
   const allEntries = Object.values(library);
+  const favoriteEntries = Object.values(favorites);
 
   const shelfCounts = shelves.reduce<Record<string, number>>((acc, shelf) => {
     acc[shelf.label] = allEntries.filter((e) => e.status === shelf.status).length;
     return acc;
   }, {});
 
-  // If the user hasn't manually picked a tab, default to the first shelf
-  // (in the priority order above) that actually has books in it. This avoids
-  // landing on an empty "Currently Reading" tab when everything saved is
-  // sitting under "Want to Read" instead.
+  const favoriteCount = favoriteEntries.length;
+
   useEffect(() => {
     if (userPickedTab) return;
     const firstNonEmpty = shelves.find((s) => shelfCounts[s.label] > 0);
     if (firstNonEmpty && firstNonEmpty.status !== activeTab) {
       setActiveTab(firstNonEmpty.status);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allEntries.length]);
 
   if (loading) {
@@ -50,14 +50,35 @@ export default function LibraryPage() {
     );
   }
 
-  const visibleEntries = allEntries.filter((e) => e.status === activeTab);
+  // Display books depending on whether "FAVORITES" or standard shelf tab is active
+  const isFavoritesTab = activeTab === "FAVORITES";
+  const displayItems = isFavoritesTab
+    ? favoriteEntries.map((f) => ({
+        bookId: f.bookId,
+        title: f.title,
+        author: f.author,
+        coverUrl: f.coverUrl,
+        status: library[f.bookId]?.status,
+      }))
+    : allEntries
+        .filter((e) => e.status === activeTab)
+        .map((e) => ({
+          bookId: e.bookId,
+          title: e.title,
+          author: e.author,
+          coverUrl: e.coverUrl,
+          status: e.status,
+        }));
 
   return (
     <div className="max-w-5xl mx-auto px-4 pt-20 md:pt-24 pb-16 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold font-serif text-[#f0dfc0]">My Shelf</h1>
-          <p className="text-xs text-[#a6907c] mt-1">Your personal collection, reading progress, and saved books</p>
+          <p className="text-xs text-[#a6907c] mt-1">
+            Your personal collection, reading progress, and beloved favorites
+          </p>
         </div>
         <Button size="sm" className="gap-2 bg-[#c9a87a] text-[#0f0705] hover:bg-[#d8b88a]" asChild>
           <Link href="/discover">
@@ -87,17 +108,44 @@ export default function LibraryPage() {
             )}
           </button>
         ))}
+
+        {/* Favorites tab */}
+        <button
+          onClick={() => {
+            setActiveTab("FAVORITES");
+            setUserPickedTab(true);
+          }}
+          className={`shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-1.5 ${
+            isFavoritesTab
+              ? "bg-red-500 text-white font-semibold shadow-md shadow-red-950/30"
+              : "bg-black/40 text-foreground/80 hover:bg-black/60 border border-white/10"
+          }`}
+        >
+          <Heart className={`h-3.5 w-3.5 ${isFavoritesTab ? "fill-white text-white" : "fill-red-500 text-red-500"}`} />
+          <span>Favorites</span>
+          {favoriteCount > 0 && (
+            <span className="ml-1 text-xs opacity-85">({favoriteCount})</span>
+          )}
+        </button>
       </div>
 
-      {/* Empty state (per-shelf, honest) */}
-      {visibleEntries.length === 0 ? (
+      {/* Empty state */}
+      {displayItems.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 border border-[#c9a87a]/20">
-            <BookOpen className="h-8 w-8 text-[#c9a87a]" />
+            {isFavoritesTab ? (
+              <Heart className="h-8 w-8 text-red-400" />
+            ) : (
+              <BookOpen className="h-8 w-8 text-[#c9a87a]" />
+            )}
           </div>
-          <h2 className="text-lg font-serif font-semibold text-[#f0dfc0] mb-2">Nothing here yet</h2>
+          <h2 className="text-lg font-serif font-semibold text-[#f0dfc0] mb-2">
+            {isFavoritesTab ? "No favorites yet" : "Nothing here yet"}
+          </h2>
           <p className="text-sm text-[#a6907c] max-w-xs mb-6">
-            {allEntries.length === 0
+            {isFavoritesTab
+              ? "Tap the heart icon on any book across Bookify to collect your all-time favorites."
+              : allEntries.length === 0
               ? "Start by discovering books and saving them to your shelf."
               : `No books on your "${shelves.find((s) => s.status === activeTab)?.label}" shelf yet.`}
           </p>
@@ -106,8 +154,9 @@ export default function LibraryPage() {
           </Button>
         </div>
       ) : (
+        /* Books Grid */
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-          {visibleEntries.map((entry) => (
+          {displayItems.map((entry) => (
             <div key={entry.bookId} className="group relative">
               <Link href={`/book/${entry.bookId}`} className="block">
                 <div className="relative w-full aspect-[2/3] rounded-xl bg-[#160a05]/80 border border-[#2a1508] shadow-lg flex items-center justify-center mb-2 overflow-hidden transition-transform group-hover:-translate-y-1 group-hover:shadow-2xl">
@@ -131,11 +180,26 @@ export default function LibraryPage() {
                 </p>
               </Link>
 
-              {/* Quick shelf-move / remove menu */}
-              <div className="absolute top-2 right-2">
+              {/* Heart Favorite Button (Top-Left) */}
+              <div className="absolute top-2 left-2 z-10">
+                <FavoriteButton
+                  book={{
+                    id: entry.bookId,
+                    title: entry.title,
+                    author: entry.author,
+                    coverUrl: entry.coverUrl,
+                  }}
+                  size="sm"
+                />
+              </div>
+
+              {/* Shelf Status / Dropdown Menu (Top-Right) */}
+              <div className="absolute top-2 right-2 z-10">
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     setOpenMenuId(openMenuId === entry.bookId ? null : entry.bookId);
                   }}
                   className="w-7 h-7 rounded-full bg-background/80 backdrop-blur flex items-center justify-center border border-border"
@@ -143,6 +207,7 @@ export default function LibraryPage() {
                 >
                   <ChevronDown className="h-3.5 w-3.5" />
                 </button>
+
                 {openMenuId === entry.bookId && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
@@ -162,16 +227,20 @@ export default function LibraryPage() {
                           {s.label}
                         </button>
                       ))}
-                      <div className="h-px bg-border" />
-                      <button
-                        onClick={() => {
-                          removeBook(entry.bookId);
-                          setOpenMenuId(null);
-                        }}
-                        className="w-full text-left px-3 py-2 text-xs text-red-500 hover:bg-muted/60 transition-colors"
-                      >
-                        Remove from Library
-                      </button>
+                      {entry.status && (
+                        <>
+                          <div className="h-px bg-border" />
+                          <button
+                            onClick={() => {
+                              removeBook(entry.bookId);
+                              setOpenMenuId(null);
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs text-red-500 hover:bg-muted/60 transition-colors"
+                          >
+                            Remove from Library
+                          </button>
+                        </>
+                      )}
                     </div>
                   </>
                 )}

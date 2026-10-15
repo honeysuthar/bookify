@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { getBookDetails, fetchUniqueBooksByCategory } from "@/lib/google-books";
 import { AddToLibraryButton } from "@/components/book/add-to-library-button";
+import { FavoriteButton } from "@/components/book/favorite-button";
 import { notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
 
@@ -108,10 +109,17 @@ export default async function BookDetailPage({ params }: { params: { id: string 
             </div>
           )}
 
-          <AddToLibraryButton
-            book={{ id: book.id, title, author, coverUrl }}
-            className="w-full md:w-auto"
-          />
+          <div className="flex flex-wrap items-center gap-3">
+            <AddToLibraryButton
+              book={{ id: book.id, title, author, coverUrl }}
+              className="w-full sm:w-auto"
+            />
+            <FavoriteButton
+              book={{ id: book.id, title, author, coverUrl }}
+              showLabel
+              className="w-full sm:w-auto"
+            />
+          </div>
 
           <div>
             <h2 className="text-sm font-semibold text-foreground mb-2">About</h2>

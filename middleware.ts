@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  const hasSessionToken = request.cookies.getAll().some(cookie => cookie.name.includes('session-token'));
+  const hasSessionToken = request.cookies.getAll().some(
+    cookie => cookie.name.includes('session-token') && Boolean(cookie.value?.trim())
+  );
   
   const pathname = request.nextUrl.pathname;
   

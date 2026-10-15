@@ -149,7 +149,12 @@ export async function removeBookFromLibraryAction(
  */
 export async function toggleFavoriteAction(
   userId: string,
-  bookId: string
+  bookId: string,
+  metadata?: {
+    title?: string
+    author?: string
+    coverUrl?: string
+  }
 ): Promise<ActionResponse<{ favorited: boolean }>> {
   try {
     const sessionUserId = await getSessionUserId()
@@ -158,7 +163,7 @@ export async function toggleFavoriteAction(
       return { success: false, error: "User ID and Book ID are required" }
     }
 
-    const dbBook = await prisma.book.findFirst({
+    let dbBook = await prisma.book.findFirst({
       where: {
         OR: [
           { id: bookId },
@@ -168,7 +173,17 @@ export async function toggleFavoriteAction(
     })
 
     if (!dbBook) {
-      return { success: false, error: "Book not found in database catalog." }
+      if (metadata?.title) {
+        dbBook = await createBook({
+          externalId: bookId,
+          source: "GOOGLE_BOOKS",
+          title: metadata.title,
+          coverUrl: metadata.coverUrl,
+          authors: metadata.author ? [metadata.author] : [],
+        })
+      } else {
+        return { success: false, error: "Book not found in database catalog." }
+      }
     }
 
     const result = await toggleFavorite(actualUserId, dbBook.id)

@@ -3,16 +3,29 @@
 import { useRouter } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 
 export default function LandingPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const [leaving, setLeaving] = useState(false);
 
-  const handleEnter = () => {
+  const isLoggedIn = status === "authenticated";
+
+  const handleStartReading = () => {
     if (leaving) return;
     setLeaving(true);
-    // Brief fade-out, then navigate
-    setTimeout(() => router.push("/dashboard"), 500);
+    // If logged in from a previous session, direct straight to /dashboard
+    // Otherwise direct to /signup to begin onboarding
+    const target = isLoggedIn ? "/dashboard" : "/signup";
+    setTimeout(() => router.push(target), 500);
+  };
+
+  const handleLogIn = () => {
+    if (leaving) return;
+    setLeaving(true);
+    const target = isLoggedIn ? "/dashboard" : "/login";
+    setTimeout(() => router.push(target), 500);
   };
 
   return (
@@ -76,7 +89,7 @@ export default function LandingPage() {
         {/* Buttons */}
         <div className="flex flex-row gap-4 mt-8">
           <button
-            onClick={handleEnter}
+            onClick={handleStartReading}
             disabled={leaving}
             className="btn-primary flex items-center gap-2 px-8 py-3.5 rounded-xl text-base font-medium shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all active:translate-y-0 disabled:opacity-50"
             style={{ backgroundColor: "#0f0705", color: "#c9a87a" }}
@@ -84,12 +97,12 @@ export default function LandingPage() {
             Start Reading <ArrowRight className="h-4 w-4" />
           </button>
           <button
-            onClick={handleEnter}
+            onClick={handleLogIn}
             disabled={leaving}
             className="btn-secondary flex items-center justify-center px-8 py-3.5 rounded-xl text-base font-medium border border-[#0f0705]/20 hover:bg-[#0f0705]/5 transition-all disabled:opacity-50"
             style={{ color: "#0f0705" }}
           >
-            Log In
+            {isLoggedIn ? "Go to Hearth" : "Log In"}
           </button>
         </div>
       </div>

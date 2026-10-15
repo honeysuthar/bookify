@@ -148,7 +148,7 @@ export default function DNAPage() {
                   {dna.archetype.title}
                 </h2>
                 <p className="text-sm font-medium text-[#c9a87a]/90 italic">
-                  "{dna.archetype.subtitle}"
+                  &ldquo;{dna.archetype.subtitle}&rdquo;
                 </p>
                 <p className="text-xs sm:text-sm text-[#a6907c] leading-relaxed pt-1">
                   {dna.archetype.summary}

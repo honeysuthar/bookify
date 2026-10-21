@@ -1,5 +1,4 @@
 import NextAuth from "next-auth"
-import { PrismaAdapter } from "@auth/prisma-adapter"
 import Google from "next-auth/providers/google"
 import prisma from "./prisma"
 
@@ -7,8 +6,8 @@ import Credentials from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
-  adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
@@ -46,6 +45,43 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     })
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      if (account?.provider === "google") {
+        if (!user.email) return false
+
+        let dbUser = await prisma.user.findUnique({
+          where: { email: user.email }
+        })
+
+        if (!dbUser) {
+          // Generate unique username from email
+          const baseUsername = (user.email.split("@")[0] || "reader")
+            .toLowerCase()
+            .replace(/[^a-z0-9_]/g, "")
+            .slice(0, 15)
+          let username = baseUsername || "reader"
+          let counter = 1
+          while (await prisma.user.findUnique({ where: { username } })) {
+            username = `${baseUsername}${counter++}`
+          }
+
+          dbUser = await prisma.user.create({
+            data: {
+              email: user.email,
+              name: user.name || "Reader",
+              username,
+              avatarUrl: user.image || null,
+              authProvider: "GOOGLE",
+              emailVerified: true
+            }
+          })
+        }
+
+        user.id = dbUser.id
+        return true
+      }
+      return true
+    },
     async session({ session, token }) {
       if (token.sub && session.user) {
         session.user.id = token.sub

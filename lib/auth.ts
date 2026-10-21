@@ -1,4 +1,4 @@
-import NextAuth from "next-auth"
+﻿import NextAuth from "next-auth"
 import Google from "next-auth/providers/google"
 import prisma from "./prisma"
 
@@ -14,6 +14,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   jwt: {
     maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+  pages: {
+    signIn: "/login",
+    error: "/login",
   },
   providers: [
     Google({
@@ -45,42 +49,54 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     })
   ],
   callbacks: {
-    async signIn({ user, account }) {
-      if (account?.provider === "google") {
-        if (!user.email) return false
-
-        let dbUser = await prisma.user.findUnique({
-          where: { email: user.email }
-        })
-
-        if (!dbUser) {
-          // Generate unique username from email
-          const baseUsername = (user.email.split("@")[0] || "reader")
-            .toLowerCase()
-            .replace(/[^a-z0-9_]/g, "")
-            .slice(0, 15)
-          let username = baseUsername || "reader"
-          let counter = 1
-          while (await prisma.user.findUnique({ where: { username } })) {
-            username = `${baseUsername}${counter++}`
+    async signIn({ user, account, profile }) {
+      try {
+        if (account?.provider === "google") {
+          const rawEmail = user?.email || (profile as any)?.email
+          if (!rawEmail) {
+            console.error("[auth] Google sign-in failed: no email found in profile", { user, profile })
+            return false
           }
+          const email = rawEmail.toLowerCase().trim()
 
-          dbUser = await prisma.user.create({
-            data: {
-              email: user.email,
-              name: user.name || "Reader",
-              username,
-              avatarUrl: user.image || null,
-              authProvider: "GOOGLE",
-              emailVerified: true
+          let dbUser = await prisma.user.findFirst({
+            where: {
+              email: { equals: email, mode: "insensitive" }
             }
           })
-        }
 
-        user.id = dbUser.id
+          if (!dbUser) {
+            // Generate unique username from email
+            const baseUsername = (email.split("@")[0] || "reader")
+              .toLowerCase()
+              .replace(/[^a-z0-9_]/g, "")
+              .slice(0, 15)
+            let username = baseUsername || "reader"
+            let counter = 1
+            while (await prisma.user.findUnique({ where: { username } })) {
+              username = `${baseUsername}${counter++}`
+            }
+
+            dbUser = await prisma.user.create({
+              data: {
+                email,
+                name: user?.name || (profile as any)?.name || "Reader",
+                username,
+                avatarUrl: user?.image || (profile as any)?.picture || null,
+                authProvider: "GOOGLE",
+                emailVerified: true
+              }
+            })
+          }
+
+          user.id = dbUser.id
+          return true
+        }
         return true
+      } catch (error) {
+        console.error("[auth] Error in signIn callback:", error)
+        return false
       }
-      return true
     },
     async session({ session, token }) {
       if (token.sub && session.user) {
@@ -88,9 +104,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
       return session
     },
-    async jwt({ token, user }) {
-      if (user) {
+    async jwt({ token, user, account }) {
+      if (user?.id) {
         token.sub = user.id
+      }
+      if (token.email && (!token.sub || account?.provider === "google")) {
+        try {
+          const dbUser = await prisma.user.findFirst({
+            where: { email: { equals: token.email.toLowerCase().trim(), mode: "insensitive" } }
+          })
+          if (dbUser) {
+            token.sub = dbUser.id
+          }
+        } catch (e) {
+          console.error("[auth] Error resolving user in jwt callback:", e)
+        }
       }
       return token
     }
